@@ -38,6 +38,9 @@ const showHistoryTab = ref(false) // 控制显示日志还是历史记录
 // 所有项目列表
 const allProjects = ref([]) // 所有项目列表
 
+// 缩略图宽高比缓存 { projectName: { ratio, isWide } }
+const thumbnailRatios = ref({})
+
 // 分页相关
 const currentPage = ref(1)
 const pageSize = 6
@@ -461,6 +464,35 @@ const previewProject = async (projectName) => {
   }
 }
 
+// 处理缩略图加载，计算宽高比
+const onThumbnailLoad = (e, project) => {
+  const img = e.target
+  const { naturalWidth, naturalHeight } = img
+  const ratio = naturalWidth / naturalHeight
+  
+  // 16:9 = 1.777...
+  const isWide = ratio > 16 / 9
+  
+  thumbnailRatios.value[project.name] = { ratio, isWide }
+  
+  // 隐藏占位符
+  img.nextElementSibling.style.display = 'none'
+}
+
+// 获取缩略图样式
+const getThumbnailStyle = (project) => {
+  const ratioData = thumbnailRatios.value[project.name]
+  if (!ratioData) return {}
+  
+  if (ratioData.isWide) {
+    // 横长竖短（宽 > 高，比例 > 16:9）→ 居中显示
+    return { objectPosition: 'center' }
+  } else {
+    // 横短竖长（比例 <= 16:9）→ 顶部对齐
+    return { objectPosition: 'top center' }
+  }
+}
+
 // 处理滚动事件
 const handleScroll = () => {
   const container = terminalContentRef.value
@@ -478,47 +510,50 @@ onMounted(() => {
   <div class="terminal">
     <!-- 项目选择界面 -->
     <div v-if="showProjectSelector" class="project-selector">
-      <div class="selector-content">
-        <div class="selector-header">
-          <h2>一句话生成网页原型</h2>
-          <p class="selector-subtitle">选择或新建项目，开始创作原型吧！</p>
-        </div>
-        
-        <div class="project-list">
-          <div 
-            v-for="project in projects" 
-            :key="project"
-            class="project-item"
-            @click="selectProject(project)"
-          >
-            <span class="project-name">📁 {{ project }}</span>
-            <button 
-              class="delete-btn" 
-              @click.stop="confirmDelete(project)"
-              title="删除项目"
-            >
-              🗑️
-            </button>
+      <div class="selector-scroll-container" ref="selectorScrollRef">
+        <div class="selector-content">
+          <div class="selector-header">
+            <h2>一句话生成网页原型</h2>
+            <p class="selector-subtitle">选择或新建项目，开始创作原型吧！</p>
           </div>
-        </div>
-        
-        <div v-if="projects.length === 0" class="no-projects">
-          暂无可用项目
-        </div>
-        
-        <div class="create-project">
-          <h3>新建项目</h3>
-          <div class="input-group">
-            <input 
-              v-model="newProjectName" 
-              @keydown.enter="createProject"
-              @input="onNameInput"
-              placeholder="输入新项目名称..."
-              :class="{ 'input-error': createError }"
+          
+          <div class="project-list">
+            <div 
+              v-for="project in projects" 
+              :key="project"
+              class="project-item"
+              @click="selectProject(project)"
             >
-            <button @click="createProject">创建</button>
+              <span class="icon-container">📁</span>
+              <span class="project-name">{{ project }}</span>
+              <button 
+                class="delete-btn" 
+                @click.stop="confirmDelete(project)"
+                title="删除项目"
+              >
+                🗑️
+              </button>
+            </div>
           </div>
-          <p v-if="createError" class="error-message">{{ createError }}</p>
+          
+          <div v-if="projects.length === 0" class="no-projects">
+            暂无可用项目
+          </div>
+          
+          <div class="create-project">
+            <h3>新建项目</h3>
+            <div class="input-group">
+              <input 
+                v-model="newProjectName" 
+                @keydown.enter="createProject"
+                @input="onNameInput"
+                placeholder="输入新项目名称..."
+                :class="{ 'input-error': createError }"
+              >
+              <button @click="createProject">创建</button>
+            </div>
+            <p v-if="createError" class="error-message">{{ createError }}</p>
+          </div>
         </div>
       </div>
       
@@ -648,7 +683,8 @@ onMounted(() => {
                     v-if="project.has_html"
                     :src="`/api/projects/${project.name}/thumbnail?t=${Date.now()}`"
                     alt="项目缩略图"
-                    @load="e => e.target.nextElementSibling.style.display = 'none'"
+                    :style="getThumbnailStyle(project)"
+                    @load="e => onThumbnailLoad(e, project)"
                     @error="e => { e.target.style.display = 'none'; e.target.nextElementSibling.style.display = 'flex'; }"
                   >
                   <div class="thumbnail-placeholder">
@@ -1252,17 +1288,49 @@ onMounted(() => {
   flex: 1;
   display: flex;
   justify-content: center;
-  align-items: center;
+  align-items: flex-start;
   background-color: #1e1e1e;
   position: relative;
+  padding-top: 40px;
+}
+
+/* 项目选择器滚动容器 */
+.selector-scroll-container {
+  max-height: calc(100vh - 60px);
+  overflow-y: auto;
+  display: flex;
+  justify-content: center;
+  width: 100%;
+}
+
+/* 自定义滚动条 */
+.selector-scroll-container::-webkit-scrollbar {
+  width: 8px;
+}
+
+.selector-scroll-container::-webkit-scrollbar-track {
+  background: #1e1e1e;
+  border-radius: 4px;
+}
+
+.selector-scroll-container::-webkit-scrollbar-thumb {
+  background: #424242;
+  border-radius: 4px;
+}
+
+.selector-scroll-container::-webkit-scrollbar-thumb:hover {
+  background: #555;
 }
 
 .selector-content {
-  width: 400px;
+  width: 1000px;
+  max-width: 95vw;
   padding: 30px;
   background-color: #252526;
   border-radius: 18px;
   border: 1px solid #333;
+  display: flex;
+  flex-direction: column;
 }
 
 .selector-header {
@@ -1288,68 +1356,150 @@ onMounted(() => {
 
 .selector-content h3 {
   color: #d4d4d4;
-  margin: 20px 0 10px;
+  margin: 20px 0 15px;
   font-size: 15px;
 }
 
+/* 项目列表 - 网格布局 */
 .project-list {
-  max-height: 300px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  max-height: 400px;
   overflow-y: auto;
+  padding-right: 8px;
 }
 
+/* 自定义滚动条 */
+.project-list::-webkit-scrollbar {
+  width: 8px;
+}
+
+.project-list::-webkit-scrollbar-track {
+  background: #1e1e1e;
+  border-radius: 4px;
+}
+
+.project-list::-webkit-scrollbar-thumb {
+  background: #424242;
+  border-radius: 4px;
+}
+
+.project-list::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
+
+/* 项目卡片 */
 .project-item {
   display: flex;
-  justify-content: space-between;
+  flex-direction: row;
   align-items: center;
-  padding: 12px 15px;
-  margin: 5px 0;
+  justify-content: flex-start;
+  padding: 20px 15px;
   background-color: #2d2d30;
-  border-radius: 4px;
+  border-radius: 12px;
   cursor: pointer;
-  transition: background-color 0.2s;
+  transition: all 0.3s ease;
+  border: 1px solid transparent;
+  position: relative;
+  min-height: 120px;
 }
 
 .project-item:hover {
-  background-color: #3a3d41;
+  background-color: #353538;
+  border-color: rgba(86, 156, 214, 0.3);
+  transform: translateY(-3px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
 }
 
-.project-name {
+/* 图标容器 */
+.project-item .icon-container {
+  flex-shrink: 0;
+  margin-right: 12px;
+  font-size: 20px;
+}
+
+/* 项目名称 */
+.project-item .project-name {
   flex: 1;
+  font-size: 16px;
+  color: #d4d4d4;
+  font-weight: 500;
+  text-align: center;
+  word-break: break-all;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  box-orient: vertical;
+  overflow: hidden;
+  padding-right: 24px; /* 为删除按钮留空间 */
 }
 
-.delete-btn {
-  padding: 5px 8px;
+.project-item .delete-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  padding: 4px 6px;
   background: transparent;
   border: none;
   cursor: pointer;
-  font-size: 15px;
-  opacity: 0.6;
+  font-size: 14px;
+  opacity: 0;
   transition: opacity 0.2s;
+  border-radius: 4px;
 }
 
-.delete-btn:hover {
+.project-item:hover .delete-btn {
+  opacity: 0.6;
+}
+
+.project-item .delete-btn:hover {
   opacity: 1;
+  background-color: rgba(241, 76, 76, 0.2);
 }
 
 .no-projects {
-  padding: 20px;
+  grid-column: 1 / -1;
+  padding: 40px 20px;
   text-align: center;
   color: #666;
+  font-size: 16px;
+}
+
+.create-project {
+  margin-top: 25px;
+  padding-top: 25px;
+  border-top: 1px solid #333;
+}
+
+.create-project h3 {
+  margin-bottom: 15px;
+  color: #d4d4d4;
+  font-size: 16px;
+  text-align: center;
 }
 
 .create-project .input-group {
   display: flex;
-  gap: 10px;
+  gap: 12px;
+  max-width: 500px;
+  margin: 0 auto;
 }
 
 .create-project input {
   flex: 1;
-  padding: 10px;
+  padding: 12px 16px;
   background-color: #2d2d30;
   border: 1px solid #333;
-  border-radius: 4px;
+  border-radius: 8px;
   color: #d4d4d4;
   outline: none;
+  font-size: 15px;
+}
+
+.create-project input:focus {
+  border-color: #569cd6;
 }
 
 .create-project input.input-error {
@@ -1360,14 +1510,15 @@ onMounted(() => {
   color: #f14c4c;
   font-size: 12px;
   margin-top: 8px;
+  text-align: center;
 }
 
 .create-project button {
-  padding: 10px 20px;
+  padding: 12px 28px;
   background-color: rgba(86, 156, 214, 0.85);
   color: white;
   border: 1px solid rgba(86, 156, 214, 0.5);
-  border-radius: 18px;
+  border-radius: 20px;
   cursor: pointer;
   font-family: "Microsoft YaHei Bold", "Microsoft YaHei", "SimHei", sans-serif;
   font-size: 15px;
@@ -1376,6 +1527,7 @@ onMounted(() => {
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   box-shadow: 0 2px 8px rgba(86, 156, 214, 0.3);
+  white-space: nowrap;
 }
 
 .create-project button:hover {
@@ -1778,5 +1930,26 @@ onMounted(() => {
 
 .projects-empty p {
   font-size: 15px;
+}
+
+/* 项目选择器悬浮按钮 */
+.selector-float-btn {
+  position: fixed;
+  right: 30px;
+  bottom: 100px;
+  padding: 10px 24px;
+  background-color: rgba(86, 156, 214, 0.85);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-radius: 20px;
+  color: #ffffff;
+  font-family: "Microsoft YaHei", "SimHei", sans-serif;
+  font-size: 15px;
+  font-weight: bold;
+  cursor: pointer;
+  white-space: nowrap;
+  box-shadow: 0 4px 15px rgba(86, 156, 214, 0.4);
+  transition: all 0.3s ease;
+  z-index: 1000;
 }
 </style>
