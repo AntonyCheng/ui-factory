@@ -1423,26 +1423,15 @@ onMounted(() => {
   gap: 12px;
   max-height: 400px;
   overflow-y: auto;
-  padding-right: 8px;
+  scrollbar-width: none; /* Firefox */
 }
 
-/* 自定义滚动条 */
 .project-list::-webkit-scrollbar {
-  width: 8px;
+  display: none; /* Chrome、Safari、Edge */
 }
 
 .project-list::-webkit-scrollbar-track {
-  background: #1e1e1e;
-  border-radius: 4px;
-}
-
-.project-list::-webkit-scrollbar-thumb {
-  background: #424242;
-  border-radius: 4px;
-}
-
-.project-list::-webkit-scrollbar-thumb:hover {
-  background: #555;
+  display: none;
 }
 
 /* 项目卡片 */
@@ -1459,6 +1448,8 @@ onMounted(() => {
   border: 1px solid transparent;
   position: relative;
   min-height: 120px;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .project-item:hover {
