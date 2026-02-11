@@ -676,7 +676,7 @@ onMounted(() => {
             :disabled="isGenerating || !promptText.trim()"
             class="generate-btn"
           >
-            <span v-if="!isGenerating">生&nbsp;&nbsp;&nbsp;成</span>
+            <span v-if="!isGenerating">生 成</span>
             <span v-else class="loading-btn">
               <span class="loading-spinner"></span>
               生成中...
@@ -686,21 +686,21 @@ onMounted(() => {
             class="refresh-btn"
             @click="refreshPreview"
           >
-            刷&nbsp;&nbsp;&nbsp;新
+            刷 新
           </button>
           <button 
             @click="openOutputModal"
             class="output-btn"
             title="查看日志"
           >
-            日&nbsp;&nbsp;&nbsp;志
+            日 志
           </button>
           <button 
             class="capture-btn"
             @click="captureThumbnail"
             :disabled="isCapturing"
           >
-            <span v-if="!isCapturing">截&nbsp;&nbsp;&nbsp;图</span>
+            <span v-if="!isCapturing">截 图</span>
             <span v-else>截图中...</span>
           </button>
           <button 
@@ -710,7 +710,7 @@ onMounted(() => {
             :disabled="isGenerating"
             :class="{ 'disabled': isGenerating }"
           >
-            退&nbsp;&nbsp;&nbsp;出
+            退 出
           </button>
         </div>
         <p v-if="generateError" class="error-message">{{ generateError }}</p>
@@ -718,7 +718,7 @@ onMounted(() => {
       
       <!-- 悬浮滚动按钮 -->
       <div class="scroll-float-btn" @click="toggleScroll">
-        {{ isAtTop ? '更多项目' : '当前项目' }}
+        {{ isAtTop ? '更 多 项 目' : '当 前 项 目' }}
       </div>
       
       <!-- 项目卡片列表 -->
@@ -867,7 +867,7 @@ onMounted(() => {
 }
 
 .refresh-btn {
-  padding: 10px 27px;
+  padding: 10px 20px;
   border: 1px solid rgba(86, 156, 214, 0.5);
   border-radius: 30px;
   cursor: pointer;
@@ -890,7 +890,7 @@ onMounted(() => {
 }
 
 .capture-btn {
-  padding: 10px 27px;
+  padding: 10px 20px;
   border: 1px solid rgba(34, 197, 94, 0.5);
   border-radius: 30px;
   cursor: pointer;
@@ -1039,7 +1039,7 @@ onMounted(() => {
 }
 
 .generate-btn {
-  padding: 10px 27px;
+  padding: 10px 20px;
   background-color: rgba(86, 156, 214, 0.85);
   color: white;
   border: 1px solid rgba(86, 156, 214, 0.5);
@@ -1068,7 +1068,7 @@ onMounted(() => {
 
 /* 输出按钮 */
 .output-btn {
-  padding: 10px 27px;
+  padding: 10px 20px;
   background-color: rgba(86, 156, 214, 0.85);
   color: white;
   border: 1px solid rgba(86, 156, 214, 0.5);
@@ -1110,7 +1110,7 @@ onMounted(() => {
 }
 
 .exit-btn-red {
-  padding: 10px 27px;
+  padding: 10px 20px;
   background-color: rgba(241, 76, 76, 0.85);
   color: white;
   border: 1px solid rgba(241, 76, 76, 0.5);
