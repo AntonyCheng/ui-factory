@@ -353,10 +353,22 @@ const closeOutputModal = () => {
 }
 
 // 刷新预览
-const refreshPreview = () => {
+const refreshPreview = async () => {
+  // 先检查文件是否存在
+  try {
+    const checkResponse = await fetch('/api/html?' + Date.now())
+    if (!checkResponse.ok) {
+      return  // 404，不做任何反应
+    }
+  } catch (e) {
+    return  // 请求失败，不做任何反应
+  }
+
+  // 文件存在，刷新 iframe
   htmlUrl.value = ''
   setTimeout(() => {
     htmlUrl.value = '/api/html?' + Date.now()
+    showToastMessage('刷新成功')
   }, 100)
 }
 
@@ -417,10 +429,11 @@ const captureThumbnail = async () => {
           
           if (res.ok) {
             output.value += `✅ 缩略图已保存！\n`
+            showToastMessage('截图成功')
           } else {
             throw new Error('保存失败')
           }
-          
+
           isCapturing.value = false
           scrollToBottom()
         }, 'image/png')
@@ -663,7 +676,7 @@ onMounted(() => {
             :disabled="isGenerating || !promptText.trim()"
             class="generate-btn"
           >
-            <span v-if="!isGenerating">生成</span>
+            <span v-if="!isGenerating">生&nbsp;&nbsp;&nbsp;成</span>
             <span v-else class="loading-btn">
               <span class="loading-spinner"></span>
               生成中...
@@ -673,21 +686,21 @@ onMounted(() => {
             class="refresh-btn"
             @click="refreshPreview"
           >
-            刷新
+            刷&nbsp;&nbsp;&nbsp;新
           </button>
           <button 
             @click="openOutputModal"
             class="output-btn"
             title="查看日志"
           >
-            日志
+            日&nbsp;&nbsp;&nbsp;志
           </button>
           <button 
             class="capture-btn"
             @click="captureThumbnail"
             :disabled="isCapturing"
           >
-            <span v-if="!isCapturing">截图</span>
+            <span v-if="!isCapturing">截&nbsp;&nbsp;&nbsp;图</span>
             <span v-else>截图中...</span>
           </button>
           <button 
@@ -697,7 +710,7 @@ onMounted(() => {
             :disabled="isGenerating"
             :class="{ 'disabled': isGenerating }"
           >
-            退出
+            退&nbsp;&nbsp;&nbsp;出
           </button>
         </div>
         <p v-if="generateError" class="error-message">{{ generateError }}</p>
@@ -854,9 +867,9 @@ onMounted(() => {
 }
 
 .refresh-btn {
-  padding: 10px 20px;
+  padding: 10px 27px;
   border: 1px solid rgba(86, 156, 214, 0.5);
-  border-radius: 18px;
+  border-radius: 30px;
   cursor: pointer;
   font-family: "Microsoft YaHei Bold", "Microsoft YaHei", "SimHei", sans-serif;
   font-size: 15px;
@@ -877,9 +890,9 @@ onMounted(() => {
 }
 
 .capture-btn {
-  padding: 10px 20px;
+  padding: 10px 27px;
   border: 1px solid rgba(34, 197, 94, 0.5);
-  border-radius: 18px;
+  border-radius: 30px;
   cursor: pointer;
   font-family: "Microsoft YaHei Bold", "Microsoft YaHei", "SimHei", sans-serif;
   font-size: 15px;
@@ -966,9 +979,9 @@ onMounted(() => {
 /* 悬浮滚动按钮 */
 .scroll-float-btn {
   position: fixed;
-  right: 30px;
+  right: 20px;
   bottom: 100px;
-  padding: 8px 24px;
+  padding: 10px 20px;
   background-color: rgba(94, 92, 92, 0.4);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
@@ -1026,11 +1039,11 @@ onMounted(() => {
 }
 
 .generate-btn {
-  padding: 10px 20px;
+  padding: 10px 27px;
   background-color: rgba(86, 156, 214, 0.85);
   color: white;
   border: 1px solid rgba(86, 156, 214, 0.5);
-  border-radius: 18px;
+  border-radius: 30px;
   cursor: pointer;
   font-family: "Microsoft YaHei Bold", "Microsoft YaHei", "SimHei", sans-serif;
   font-size: 15px;
@@ -1055,11 +1068,11 @@ onMounted(() => {
 
 /* 输出按钮 */
 .output-btn {
-  padding: 10px 20px;
+  padding: 10px 27px;
   background-color: rgba(86, 156, 214, 0.85);
   color: white;
   border: 1px solid rgba(86, 156, 214, 0.5);
-  border-radius: 18px;
+  border-radius: 30px;
   cursor: pointer;
   font-family: "Microsoft YaHei Bold", "Microsoft YaHei", "SimHei", sans-serif;
   font-size: 15px;
@@ -1097,11 +1110,11 @@ onMounted(() => {
 }
 
 .exit-btn-red {
-  padding: 10px 20px;
+  padding: 10px 27px;
   background-color: rgba(241, 76, 76, 0.85);
   color: white;
   border: 1px solid rgba(241, 76, 76, 0.5);
-  border-radius: 18px;
+  border-radius: 30px;
   cursor: pointer;
   font-family: "Microsoft YaHei Bold", "Microsoft YaHei", "SimHei", sans-serif;
   font-size: 15px;
