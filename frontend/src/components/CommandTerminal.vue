@@ -12,6 +12,7 @@ const newProjectName = ref('')
 const showDeleteConfirm = ref(false)
 const projectToDelete = ref(null)
 const createError = ref('')
+const projectNameInputRef = ref(null) // 项目名称输入框的 ref
 
 // 重命名相关状态
 const renamingProject = ref(null) // 正在重命名的项目名称（选择界面）
@@ -216,6 +217,9 @@ const createProject = async () => {
   if (!newProjectName.value.trim()) return
   createError.value = ''
   
+  // 先让输入框失去焦点，避免点击事件被拦截
+  projectNameInputRef.value?.blur()
+  
   try {
     const res = await fetch('/api/projects', {
       method: 'POST',
@@ -410,6 +414,9 @@ const exitProject = async () => {
   
   try {
     await fetch('/api/projects/exit', { method: 'POST' })
+    // 先刷新项目列表数据（确保显示重命名后的最新名称）
+    await loadProjects()
+    // 再跳转显示项目选择界面
     currentProject.value = null
     showProjectSelector.value = true
     output.value = ''
@@ -720,6 +727,7 @@ onMounted(() => {
           <div class="create-project">
             <div class="input-group">
               <input 
+                ref="projectNameInputRef"
                 v-model="newProjectName" 
                 @keydown.enter="createProject"
                 @input="onNameInput"

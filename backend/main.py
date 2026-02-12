@@ -65,12 +65,30 @@ def run_command_sync(command: str, cwd: str = None) -> str:
 
 @app.get("/api/projects")
 async def get_projects():
-    """获取项目列表"""
+    """获取项目列表（按创建时间降序排列）"""
     if not PROJECTS_DIR or not os.path.exists(PROJECTS_DIR):
         return {"projects": [], "current_project": CURRENT_PROJECT}
     
     items = os.listdir(PROJECTS_DIR)
-    projects = [item for item in items if os.path.isdir(os.path.join(PROJECTS_DIR, item))]
+    projects_with_time = []
+    
+    for item in items:
+        project_path = os.path.join(PROJECTS_DIR, item)
+        if os.path.isdir(project_path):
+            # 获取目录的修改时间
+            try:
+                stat = os.stat(project_path)
+                mtime = stat.st_mtime
+            except:
+                mtime = 0
+            projects_with_time.append((item, mtime))
+    
+    # 按修改时间降序排列（最新的在前）
+    projects_with_time.sort(key=lambda x: x[1], reverse=True)
+    
+    # 提取排序后的项目名称
+    projects = [item[0] for item in projects_with_time]
+    
     return {"projects": projects, "current_project": CURRENT_PROJECT}
 
 
