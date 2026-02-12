@@ -783,7 +783,7 @@ onMounted(() => {
                 ref="projectNameInputRef"
                 v-model="promptText"
                 @keydown.enter="quickGenerate"
-                placeholder="描述你想要生成的网页..."
+                placeholder="描述你想要生成的前端原型..."
                 :class="{ 'input-error': createError }"
               >
               <button @click="quickGenerate">生成</button>
@@ -942,7 +942,7 @@ onMounted(() => {
           <input 
             v-model="promptText" 
             @keydown.enter="generateWebpage"
-            placeholder="描述你想要生成的网页..."
+            placeholder="描述你想要生成的前端原型..."
             :disabled="isGenerating"
             class="generate-input"
           >
@@ -1704,7 +1704,7 @@ onMounted(() => {
   align-items: flex-start;
   background-color: #1e1e1e;
   position: relative;
-  padding-top: 70px;
+  padding-top: 150px;
 }
 
 /* 项目选择器滚动容器 */
@@ -1736,7 +1736,7 @@ onMounted(() => {
 }
 
 .selector-content {
-  width: 1000px;
+  width: 1200px;
   max-width: 95vw;
   padding: 30px;
   background-color: #252526;
@@ -1785,7 +1785,7 @@ onMounted(() => {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 12px;
-  max-height: 450px;
+  max-height: 280px;
   overflow-y: auto;
   scrollbar-width: none; /* Firefox */
 }
@@ -1887,7 +1887,7 @@ onMounted(() => {
 .create-project .input-group {
   display: flex;
   gap: 12px;
-  max-width: 500px;
+  max-width: 1200px;
   margin: 0 auto;
 }
 
