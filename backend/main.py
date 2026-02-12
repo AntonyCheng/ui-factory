@@ -176,7 +176,8 @@ def run_command_sync(command: str, cwd: str = None) -> str:
             text=True,
             encoding=platform_config.encoding,
             errors='replace',
-            cwd=cwd
+            cwd=cwd,
+            stdin=subprocess.DEVNULL  # Linux 上需要，防止 stdin 相关错误
         )
         return result.stdout + result.stderr
     except Exception as e:
