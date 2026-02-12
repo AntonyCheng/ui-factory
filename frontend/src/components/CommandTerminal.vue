@@ -8,7 +8,6 @@ const outputArea = ref(null)
 const projects = ref([])
 const currentProject = ref(null)
 const showProjectSelector = ref(true)
-const newProjectName = ref('')
 const showDeleteConfirm = ref(false)
 const projectToDelete = ref(null)
 const createError = ref('')
@@ -20,6 +19,9 @@ const tempProjectName = ref('') // 重命名时临时存储的新名称
 const isRenamingCurrentProject = ref(false) // 是否正在重命名当前项目（Header）
 const tempCurrentProjectName = ref('') // 重命名当前项目时临时存储的新名称
 const renameError = ref('') // 重命名错误信息
+const currentProjectRenameInputRef = ref(null) // 当前项目重命名输入框的 ref
+const renameInputRefs = shallowRef({}) // 选择界面项目重命名输入框的 ref（按项目名索引）
+const isSavingRename = ref(false) // 防止 blur 和回车重复保存
 
 // 生成相关状态
 const promptText = ref('')
@@ -213,23 +215,40 @@ const selectProject = async (name) => {
   }
 }
 
-const createProject = async () => {
-  if (!newProjectName.value.trim()) return
-  createError.value = ''
-  
-  // 先让输入框失去焦点，避免点击事件被拦截
+
+// 一句话生成：创建项目并自动生成
+const quickGenerate = async () => {
+  if (!promptText.value.trim()) return
+
+  // 让输入框失去焦点
   projectNameInputRef.value?.blur()
-  
+
+  const timestamp = Math.floor(Date.now() / 1000)
+  const projectName = `Untitled-${timestamp}`
+
   try {
+    // 1. 创建项目
     const res = await fetch('/api/projects', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: newProjectName.value })
+      body: JSON.stringify({ name: projectName })
     })
+
     if (res.ok) {
-      newProjectName.value = ''
-      createError.value = ''
-      await loadProjects()
+      // 2. 调用 API 选择项目（设置后端的 CURRENT_PROJECT）
+      await fetch(`/api/projects/${projectName}/select`, { method: 'POST' })
+
+      // 3. 添加到 projects 列表
+      projects.value.push({ name: projectName })
+
+      // 4. 设置 currentProject
+      currentProject.value = { name: projectName }
+
+      // 5. 进入项目
+      showProjectSelector.value = false
+
+      // 6. 自动生成
+      await generateWebpage()
     } else {
       const data = await res.json()
       createError.value = data.detail || '创建失败'
@@ -240,9 +259,7 @@ const createProject = async () => {
 }
 
 // 监听输入，清空错误提示
-const onNameInput = () => {
-  createError.value = ''
-}
+// onNameInput 函数已删除，因为不再使用
 
 const confirmDelete = (name) => {
   projectToDelete.value = name
@@ -275,19 +292,40 @@ const cancelDelete = () => {
 // ========== 重命名相关方法 ==========
 
 // 开始重命名项目（选择界面）
+let renameTimeoutId = null
 const startRename = (projectName) => {
   // 如果正在生成中，禁止操作
   if (isGenerating.value) return
   renamingProject.value = projectName
   tempProjectName.value = projectName
   renameError.value = ''
+  // 清除之前的定时器
+  if (renameTimeoutId) {
+    clearTimeout(renameTimeoutId)
+  }
+  // 延迟聚焦，等待 DOM 更新和 ref 设置
+  renameTimeoutId = setTimeout(() => {
+    // 确保 ref 对象存在
+    if (!renameInputRefs.value) renameInputRefs.value = {}
+    const inputEl = renameInputRefs.value[projectName]
+    if (inputEl) {
+      inputEl.focus()
+      inputEl.select()
+    }
+  }, 50)
 }
 
 // 取消重命名（选择界面）
 const cancelRename = () => {
+  // 保存当前正在重命名的项目名，以便清理 ref
+  const projectToClear = renamingProject.value
   renamingProject.value = null
   tempProjectName.value = ''
   renameError.value = ''
+  // 清理 ref
+  if (projectToClear) {
+    delete renameInputRefs.value[projectToClear]
+  }
 }
 
 // 保存重命名（选择界面）
@@ -341,11 +379,16 @@ const onRenameKeydown = (event, originalName) => {
 }
 
 // 开始重命名当前项目（Header）
-const startRenameCurrentProject = () => {
+const startRenameCurrentProject = async () => {
+  // 如果正在生成中，禁止操作
+  if (isGenerating.value) return
   if (!currentProject.value?.name) return
   isRenamingCurrentProject.value = true
   tempCurrentProjectName.value = currentProject.value.name
   renameError.value = ''
+  // 等待 DOM 更新后聚焦输入框
+  await nextTick()
+  currentProjectRenameInputRef.value?.focus()
 }
 
 // 取消重命名当前项目
@@ -396,12 +439,22 @@ const saveRenameCurrentProject = async () => {
 
 // 当前项目重命名输入框失去焦点
 const onCurrentProjectRenameBlur = () => {
+  // 如果是按回车触发的 blur，不重复保存
+  if (isSavingRename.value) {
+    isSavingRename.value = false
+    return
+  }
   saveRenameCurrentProject()
 }
 
 // 当前项目重命名输入框按键事件
 const onCurrentProjectRenameKeydown = (event) => {
   if (event.key === 'Enter') {
+    // 设置标志位，防止 blur 时重复保存
+    isSavingRename.value = true
+    // 先关闭编辑状态
+    isRenamingCurrentProject.value = false
+    // 再执行保存
     saveRenameCurrentProject()
   } else if (event.key === 'Escape') {
     cancelRenameCurrentProject()
@@ -726,15 +779,14 @@ onMounted(() => {
           
           <div class="create-project">
             <div class="input-group">
-              <input 
+              <input
                 ref="projectNameInputRef"
-                v-model="newProjectName" 
-                @keydown.enter="createProject"
-                @input="onNameInput"
-                placeholder="输入新项目名称..."
+                v-model="promptText"
+                @keydown.enter="quickGenerate"
+                placeholder="描述你想要生成的网页..."
                 :class="{ 'input-error': createError }"
               >
-              <button @click="createProject">创建</button>
+              <button @click="quickGenerate">生成</button>
             </div>
             <p v-if="createError" class="error-message">{{ createError }}</p>
           </div>
@@ -778,7 +830,12 @@ onMounted(() => {
                   class="rename-input"
                   @keydown="onRenameKeydown($event, project)"
                   @blur="onRenameInputBlur(project)"
-                  ref="renameInputRef"
+                  :ref="(el) => { 
+                    if (el) {
+                      if (!renameInputRefs.value) renameInputRefs.value = {}
+                      renameInputRefs.value[project] = el
+                    }
+                  }"
                   placeholder="输入新名称..."
                   @click.stop
                 >
