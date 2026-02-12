@@ -250,7 +250,13 @@ const quickGenerate = async () => {
       // 6. 显示创建项目提示
       showToastMessage(`已创建"${projectName}"项目，正在妙语生花...`)
 
-      // 7. 自动生成
+      // 7. 加载历史提示词记录
+      await loadPromptHistory()
+
+      // 8. 加载项目卡片数据
+      await loadProjectCards()
+
+      // 9. 自动生成
       await generateWebpage()
     } else {
       const data = await res.json()

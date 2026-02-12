@@ -6,8 +6,101 @@ import subprocess
 import asyncio
 import json
 import os
+import platform
+import shutil
+import re
 from pathlib import Path
 from datetime import datetime
+from enum import Enum
+
+class Platform(Enum):
+    WINDOWS = "windows"
+    LINUX = "linux"
+    MACOS = "darwin"
+
+class PlatformConfig:
+    """平台配置管理器"""
+    _instance = None
+    _platform = None
+    _shell_command = None
+    _encoding = None
+    _opencode_command = None
+
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+            cls._instance._initialize()
+        return cls._instance
+
+    def _initialize(self):
+        """初始化平台配置"""
+        self._platform = platform.system().lower()
+
+        if self._platform == "windows":
+            self._shell_command = "cmd.exe /c"
+            self._encoding = "gbk"
+        else:  # Linux or MacOS
+            self._shell_command = "/bin/bash -c"
+            self._encoding = "utf-8"
+
+    @property
+    def platform(self) -> str:
+        return self._platform
+
+    @property
+    def shell_command(self) -> str:
+        return self._shell_command
+
+    @property
+    def encoding(self) -> str:
+        return self._encoding
+
+    @property
+    def opencode_command(self) -> str:
+        """获取opencode命令（支持不同系统）"""
+        if self._opencode_command:
+            return self._opencode_command
+
+        # 首先尝试 which/where 命令查找
+        try:
+            if self._platform == "windows":
+                result = subprocess.run(
+                    "where opencode",
+                    shell=True,
+                    capture_output=True,
+                    text=True,
+                    timeout=5
+                )
+            else:
+                result = subprocess.run(
+                    "which opencode",
+                    shell=True,
+                    capture_output=True,
+                    text=True,
+                    timeout=5
+                )
+
+            if result.returncode == 0 and result.stdout.strip():
+                self._opencode_command = "opencode"
+                return self._opencode_command
+        except Exception:
+            pass
+
+        # 默认使用 opencode
+        self._opencode_command = "opencode"
+        return self._opencode_command
+
+    def is_windows(self) -> bool:
+        return self._platform == "windows"
+
+    def is_linux(self) -> bool:
+        return self._platform == "linux"
+
+    def is_macos(self) -> bool:
+        return self._platform == "darwin"
+
+# 全局平台配置实例
+platform_config = PlatformConfig()
 
 app = FastAPI()
 
@@ -25,12 +118,34 @@ CONFIG_FILE = Path(__file__).parent / "config.json"
 PROJECTS_DIR = None
 CURRENT_PROJECT = {"path": None, "name": None}
 
+def convert_windows_path_to_native(windows_path: str) -> str:
+    """将Windows路径格式转换为当前系统的原生路径格式"""
+    if not windows_path:
+        return windows_path
+
+    # 使用 Path 处理，自动转换为当前系统的路径格式
+    path = Path(windows_path)
+
+    # 处理相对路径
+    if not path.is_absolute():
+        # 对于相对路径，也需要确保格式正确
+        path = Path(windows_path.replace('\\', '/'))
+
+    return str(path)
+
 def load_config():
+    """加载配置文件（跨平台支持）"""
     global PROJECTS_DIR
     if CONFIG_FILE.exists():
         with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
             config = json.load(f)
-            PROJECTS_DIR = config.get("projects_dir")
+            raw_projects_dir = config.get("projects_dir")
+
+            # 转换为当前系统的路径格式
+            if raw_projects_dir:
+                PROJECTS_DIR = convert_windows_path_to_native(raw_projects_dir)
+            else:
+                PROJECTS_DIR = None
     else:
         PROJECTS_DIR = None
 
@@ -38,8 +153,11 @@ load_config()
 
 
 def get_thumbnail_path(project_path: str) -> str:
-    """获取项目的缩略图路径"""
-    return os.path.join(project_path, ".thumbnail.png")
+    """获取项目的缩略图路径（跨平台支持）"""
+    # 使用 pathlib 确保跨平台兼容性
+    project_dir = Path(project_path)
+    thumbnail_path = project_dir / ".thumbnail.png"
+    return str(thumbnail_path)
 
 
 class ProjectRequest(BaseModel):
@@ -47,20 +165,37 @@ class ProjectRequest(BaseModel):
 
 
 def run_command_sync(command: str, cwd: str = None) -> str:
-    """同步执行命令（运行在后台线程）"""
+    """同步执行命令（跨平台支持）"""
     try:
+        # 根据平台选择shell和编码
+        shell_cmd = f'{platform_config.shell_command} "{command}"' if platform_config.is_windows() else f"{platform_config.shell_command} '{command}'"
         result = subprocess.run(
-            f'cmd.exe /c {command}',
+            shell_cmd,
             shell=True,
             capture_output=True,
             text=True,
-            encoding='gbk',
+            encoding=platform_config.encoding,
             errors='replace',
             cwd=cwd
         )
         return result.stdout + result.stderr
     except Exception as e:
         return f"Error: {str(e)}"
+
+
+def build_opencode_command(prompt: str) -> str:
+    """构建opencode命令（跨平台支持）"""
+    # 获取opencode命令
+    opencode_cmd = platform_config.opencode_command
+
+    # 转义引号 - Windows和Linux/Mac处理方式相同
+    escaped_prompt = prompt.replace('"', '\\"')
+
+    # 构建完整的命令
+    # 使用双引号包裹整个参数，确保跨平台兼容
+    full_command = f'{opencode_cmd} run "/ui-ux-pro-max [ROLE] 你是一个专业的前端开发者，擅长将需求转化为精美的网页原型\\n[TASK] 根据用户需求生成一个完整的单文件HTML网页，如果项目中已经存在单文件HTML网页，那就先分析用户需求是否想在原有文件风格基础上进行修改，一般来说只要用户没有特意提出类似于"重新生成XXX"的需求，那就直接在原有文件风格基础上进行修改\\n[REQUIREMENTS]\\n1. 输出完整的 HTML5 代码（包含 CSS 和 JavaScript）\\n2. 将代码保存为 index.html（直接覆盖）\\n3. 无论用户需求是什么语言，生成的页面内容必须是中文为主要语言\\n4. 只生成前端代码，不需要后端逻辑\\n5. 基于用户需求自行选择UI风格，要求风格必须简洁，美观，符合现代审美\\n6. 确保 HTML 结构完整，可直接在浏览器中打开\\n[INPUT] 用户需求：{escaped_prompt}"'
+
+    return full_command
 
 
 @app.get("/api/projects")
@@ -143,8 +278,7 @@ async def delete_project(name: str):
     if CURRENT_PROJECT["name"] == name:
         CURRENT_PROJECT["path"] = None
         CURRENT_PROJECT["name"] = None
-    
-    import shutil
+
     shutil.rmtree(project_path)
     return {"message": f"项目 {name} 已删除"}
 
@@ -199,24 +333,23 @@ class GenerateRequest(BaseModel):
 
 @app.post("/api/generate")
 async def generate_webpage(request: GenerateRequest):
-    """使用 AI 生成网页"""
+    """使用 AI 生成网页（跨平台支持）"""
     if not CURRENT_PROJECT.get("path"):
         raise HTTPException(status_code=400, detail="请先选择一个项目")
-    
+
     # 获取原始提示词
     original_prompt = request.prompt
-    
-    # 构建完整的命令
-    prompt = request.prompt.replace('"', '\\"')  # 转义引号
-    command = f'opencode run "/ui-ux-pro-max [ROLE] 你是一个专业的前端开发者，擅长将需求转化为精美的网页原型\\n[TASK] 根据用户需求生成一个完整的单文件HTML网页，如果项目中已经存在单文件HTML网页，那就先分析用户需求是否想在原有文件风格基础上进行修改，一般来说只要用户没有特意提出类似于“重新生成XXX”的需求，那就直接在原有文件风格基础上进行修改\\n[REQUIREMENTS]\\n1. 输出完整的 HTML5 代码（包含 CSS 和 JavaScript）\\n2. 将代码保存为 index.html（直接覆盖）\\n3. 无论用户需求是什么语言，生成的页面内容必须是中文为主要语言\\n4. 只生成前端代码，不需要后端逻辑\\n5. 基于用户需求自行选择UI风格，要求风格必须简洁，美观，符合现代审美\\n6. 确保 HTML 结构完整，可直接在浏览器中打开\\n[INPUT] 用户需求：{prompt}"'
-    
+
+    # 使用跨平台命令构建函数
+    command = build_opencode_command(request.prompt)
+
     cwd = CURRENT_PROJECT.get("path")
     loop = asyncio.get_event_loop()
     output = await loop.run_in_executor(
         None,
         lambda: run_command_sync(command, cwd)
     )
-    
+
     # 检查是否生成了 index.html
     index_path = os.path.join(cwd, "index.html")
     if os.path.exists(index_path):
@@ -225,7 +358,7 @@ async def generate_webpage(request: GenerateRequest):
         try:
             # 获取当前时间
             timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            
+
             if os.path.exists(prompt_file):
                 # 已有文件，追加新记录
                 with open(prompt_file, 'r', encoding='utf-8') as f:
@@ -236,7 +369,7 @@ async def generate_webpage(request: GenerateRequest):
             else:
                 # 新建文件
                 next_num = 1
-            
+
             # 追加新的提示词记录：序号 [时间] 原始提示词
             with open(prompt_file, 'a', encoding='utf-8') as f:
                 f.write(f"{next_num} [{timestamp}] {original_prompt}\n")
@@ -352,7 +485,6 @@ async def get_all_projects(page: int = 1, page_size: int = 6):
                         # 解析第一条：格式 "序号 [时间] 内容"
                         first_line = valid_lines[0]
                         # 提取时间
-                        import re
                         time_match = re.search(r'\[([^\]]+)\]', first_line)
                         if time_match:
                             first_prompt_time = time_match.group(1)
